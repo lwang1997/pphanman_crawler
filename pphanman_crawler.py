@@ -5,6 +5,7 @@ import requests
 import os
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+from multiprocessing import Pool
 from tenacity import *
 
 
@@ -41,6 +42,18 @@ def download_image(src):
     return img.content
 
 
+def download_and_save_image(image_file, src):
+    if os.path.exists(image_file):
+        return 0
+    try:
+        img = download_image(src)
+        with open(image_file, "wb") as f:
+            f.write(img)
+        return 0
+    except Exception:
+        return 1
+
+
 def download_chapter(comic_name, chapter_name, chapter_url):
     mark = os.path.join(top_dir, comic_name, chapter_name, "mark")
 
@@ -64,15 +77,17 @@ def download_chapter(comic_name, chapter_name, chapter_url):
             (image.img.attrs.get("alt"), image.img.attrs.get("src")) for image in images
         ]
 
-        for alt, src in tqdm(images, desc=chapter_name, position=2, leave=False):
-            # print("    " + alt)
-            image_file = os.path.join(top_dir, comic_name, chapter_name, alt)
-            if os.path.exists(image_file):
-                continue
-            img = download_image(src)
-            with open(image_file, "wb") as f:
-                f.write(img)
-        os.remove(mark)
+        result = sum(
+            pool.starmap(
+                download_and_save_image,
+                (
+                    (os.path.join(top_dir, comic_name, chapter_name, alt), src)
+                    for alt, src in images
+                ),
+            )
+        )
+        if result == 0:
+            os.remove(mark)
     except Exception as e:
         print(e)
 
@@ -90,5 +105,6 @@ def download(comic_name, comic_url):
 if __name__ == "__main__":
     comics = get_ascension()
     top_dir = os.getcwd()
+    pool = Pool(20)
     for comic_name, comic_url in tqdm(comics, desc="pphanman", position=0):
         download(comic_name, comic_url)
