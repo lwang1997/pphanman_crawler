@@ -4,7 +4,6 @@
 import requests
 import os
 from bs4 import BeautifulSoup
-from collections import OrderedDict as od
 from tenacity import *
 
 
@@ -22,17 +21,17 @@ def get_ascension():
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.content, features="lxml")
     comics = soup.select(".rank-item")
-    return od(
+    return [
         (comic.select(".comic-name")[0].string, full_url(comic.a.attrs.get("href")))
         for comic in comics
-    )
+    ]
 
 
 def get_chapters(url):
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.content, features="lxml")
     chapters = soup.select(".chapter-item")
-    return od((c.a.string, full_url(c.a.attrs.get("href"))) for c in chapters)
+    return [(c.a.string, full_url(c.a.attrs.get("href"))) for c in chapters]
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(5))
@@ -60,10 +59,11 @@ def download_chapter(comic_name, chapter_name, chapter_url):
         response = requests.get(chapter_url, headers=HEADERS)
         soup = BeautifulSoup(response.content, features="lxml")
         images = soup.select(".comic-page")
-        images = od(
+        images = [
             (image.img.attrs.get("alt"), image.img.attrs.get("src")) for image in images
-        )
-        for alt, src in images.items():
+        ]
+
+        for alt, src in images:
             print("    " + alt)
             image_file = os.path.join(top_dir, comic_name, chapter_name, alt)
             if os.path.exists(image_file):
@@ -81,12 +81,12 @@ def download(comic_name, comic_url):
     comic_dir = os.path.join(top_dir, comic_name)
     os.path.exists(comic_dir) or os.mkdir(comic_dir)
     chapters = get_chapters(comic_url)
-    for chapter_name, chapter_url in chapters.items():
+    for chapter_name, chapter_url in chapters:
         download_chapter(comic_name, chapter_name, chapter_url)
 
 
 if __name__ == "__main__":
     comics = get_ascension()
     top_dir = os.getcwd()
-    for comic_name, comic_url in comics.items():
+    for comic_name, comic_url in comics:
         download(comic_name, comic_url)
