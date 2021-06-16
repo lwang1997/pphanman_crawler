@@ -4,6 +4,8 @@
 import requests
 import os
 from bs4 import BeautifulSoup
+from tenacity import *
+
 
 HEADERS = {
     "user-agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:87.0) Gecko/20100101 Firefox/87.0"
@@ -32,6 +34,12 @@ def get_chapters(url):
     return {c.a.string: full_url(c.a.attrs.get("href")) for c in chapters}
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(5))
+def download_image(src):
+    img = requests.get(src, headers=HEADERS)
+    return img.content
+
+
 def download_chapter(comic_name, chapter_name, chapter_url):
     mark = os.path.join(top_dir, comic_name, chapter_name, "mark")
 
@@ -54,11 +62,14 @@ def download_chapter(comic_name, chapter_name, chapter_url):
         images = {
             image.img.attrs.get("alt"): image.img.attrs.get("src") for image in images
         }
-        for alt, src in images.items():
+        for alt, src in sorted(images.items()):
             print("    " + alt)
-            img = requests.get(src, headers=HEADERS)
-            with open(os.path.join(top_dir, comic_name, chapter_name, alt), "wb") as f:
-                f.write(img.content)
+            image_file = os.path.join(top_dir, comic_name, chapter_name, alt)
+            if os.path.exists(image_file):
+                continue
+            img = download_image(src)
+            with open(image_file, "wb") as f:
+                f.write(img)
         os.remove(mark)
     except Exception as e:
         print(e)
@@ -69,12 +80,12 @@ def download(comic_name, comic_url):
     comic_dir = os.path.join(top_dir, comic_name)
     os.path.exists(comic_dir) or os.mkdir(comic_dir)
     chapters = get_chapters(comic_url)
-    for chapter_name, chapter_url in chapters.items():
+    for chapter_name, chapter_url in sorted(chapters.items()):
         download_chapter(comic_name, chapter_name, chapter_url)
 
 
 if __name__ == "__main__":
     comics = get_ascension()
     top_dir = os.getcwd()
-    for comic_name, comic_url in comics.items():
+    for comic_name, comic_url in sorted(comics.items()):
         download(comic_name, comic_url)
