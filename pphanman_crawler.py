@@ -4,6 +4,7 @@
 import requests
 import os
 from bs4 import BeautifulSoup
+from tqdm import tqdm
 from tenacity import *
 
 
@@ -54,7 +55,7 @@ def download_chapter(comic_name, chapter_name, chapter_url):
     if is_chapter_completed():
         return
 
-    print("  chapter: " + chapter_name)
+    # print("  chapter: " + chapter_name)
     try:
         response = requests.get(chapter_url, headers=HEADERS)
         soup = BeautifulSoup(response.content, features="lxml")
@@ -63,8 +64,8 @@ def download_chapter(comic_name, chapter_name, chapter_url):
             (image.img.attrs.get("alt"), image.img.attrs.get("src")) for image in images
         ]
 
-        for alt, src in images:
-            print("    " + alt)
+        for alt, src in tqdm(images, desc=chapter_name, position=2, leave=False):
+            # print("    " + alt)
             image_file = os.path.join(top_dir, comic_name, chapter_name, alt)
             if os.path.exists(image_file):
                 continue
@@ -77,16 +78,17 @@ def download_chapter(comic_name, chapter_name, chapter_url):
 
 
 def download(comic_name, comic_url):
-    print("comic: " + comic_name)
     comic_dir = os.path.join(top_dir, comic_name)
     os.path.exists(comic_dir) or os.mkdir(comic_dir)
     chapters = get_chapters(comic_url)
-    for chapter_name, chapter_url in chapters:
+    for chapter_name, chapter_url in tqdm(
+        chapters, desc=comic_name, position=1, leave=False
+    ):
         download_chapter(comic_name, chapter_name, chapter_url)
 
 
 if __name__ == "__main__":
     comics = get_ascension()
     top_dir = os.getcwd()
-    for comic_name, comic_url in comics:
+    for comic_name, comic_url in tqdm(comics, desc="pphanman", position=0):
         download(comic_name, comic_url)
