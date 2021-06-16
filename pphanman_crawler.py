@@ -19,26 +19,26 @@ def get_ascension():
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.content, features="lxml")
     comics = soup.select(".rank-item")
-    comics = {
+    return {
         comic.select(".comic-name")[0].string: full_url(comic.a.attrs.get("href"))
         for comic in comics
     }
-    return comics
 
 
 def get_chapters(url):
     response = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(response.content, features="lxml")
     chapters = soup.select(".chapter-item")
-    chapters = {c.a.string: full_url(c.a.attrs.get("href")) for c in chapters}
-    return chapters
+    return {c.a.string: full_url(c.a.attrs.get("href")) for c in chapters}
 
 
-def download_chapter(name, url):
+def download_chapter(comic_name, chapter_name, chapter_url):
+    mark = os.path.join(top_dir, comic_name, chapter_name, "mark")
+
     def is_chapter_completed():
-        mark = name + "/mark"
-        if not os.path.exists(name):
-            os.mkdir(name)
+        chapter_dir = os.path.join(top_dir, comic_name, chapter_name)
+        if not os.path.exists(chapter_dir):
+            os.mkdir(chapter_dir)
             open(mark, "w")
             return False
         return not os.path.exists(mark)
@@ -46,11 +46,9 @@ def download_chapter(name, url):
     if is_chapter_completed():
         return
 
-    os.chdir(name)
-
-    print("  chapter: " + name)
+    print("  chapter: " + chapter_name)
     try:
-        response = requests.get(url, headers=HEADERS)
+        response = requests.get(chapter_url, headers=HEADERS)
         soup = BeautifulSoup(response.content, features="lxml")
         images = soup.select(".comic-page")
         images = {
@@ -59,26 +57,24 @@ def download_chapter(name, url):
         for alt, src in images.items():
             print("    " + alt)
             img = requests.get(src, headers=HEADERS)
-            with open(alt, "wb") as f:
+            with open(os.path.join(top_dir, comic_name, chapter_name, alt), "wb") as f:
                 f.write(img.content)
-        os.remove("mark")
+        os.remove(mark)
     except Exception as e:
         print(e)
 
-    os.chdir("..")
 
-
-def download(name, url):
-    print("comic: " + name)
-    if not os.path.exists(name):
-        os.mkdir(name)
-    chapters = get_chapters(url)
-    os.chdir(name)
-    for cname, curl in chapters.items():
-        download_chapter(cname, curl)
+def download(comic_name, comic_url):
+    print("comic: " + comic_name)
+    comic_dir = os.path.join(top_dir, comic_name)
+    os.path.exists(comic_dir) or os.mkdir(comic_dir)
+    chapters = get_chapters(comic_url)
+    for chapter_name, chapter_url in chapters.items():
+        download_chapter(comic_name, chapter_name, chapter_url)
 
 
 if __name__ == "__main__":
     comics = get_ascension()
-    for name, url in comics.items():
-        download(name, url)
+    top_dir = os.getcwd()
+    for comic_name, comic_url in comics.items():
+        download(comic_name, comic_url)
