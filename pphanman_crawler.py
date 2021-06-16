@@ -68,9 +68,6 @@ def download_chapter(comic_name, chapter_name, chapter_url):
     if is_chapter_completed():
         return
 
-    with open("/tmp/pphanman_crawler.lock", "w") as f:
-        print(chapter_url, file=f)
-    # print("  chapter: " + chapter_name)
     try:
         response = requests.get(chapter_url, headers=HEADERS)
         soup = BeautifulSoup(response.content, features="lxml")
